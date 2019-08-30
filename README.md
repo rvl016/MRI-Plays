@@ -8,6 +8,4 @@
 # 	./Bash/script_3.0.sh
 # 		for a ugly bash version of the contents from ./Python folder. My first bash experience.
 # 	./Bash/take_notes.sh
-# 		for a dialog based script that provides a clean interface to take
-# 			notes on a MRI file, showing its attributes by using the basic
-# 			bash string macros on the filename.
+# 		for a dialog based script that provides a clean interface to take notes on a MRI file, showing its attributes by using the basic bash string macros on the filename.
