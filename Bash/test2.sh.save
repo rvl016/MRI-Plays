@@ -1,0 +1,2 @@
+afni -yesplugins >& /dev/null &
+plugout_drive 

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+cd $HOME/Documents/'fMRI data'/COBRE
+
+
+
+find -name "anat" -or -name "func" -maxdepth 3 -mindepth 3 -type d -printf '%f\n'
+
+if [ "$(3dinfo -orient sub-A00038624_ses-20130101_acq-mprage_run-01_T1w.nii.gz)" = "RPI" ]; then echo "Sim!"; else echo "Não!"; fi
