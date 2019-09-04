@@ -121,7 +121,7 @@ Show_interact()
    Notes $notetype $i
 }
 # }}}        
-specs_proccess() 
+specs_process() 
 # {{{        
 {
    local i tmp 
