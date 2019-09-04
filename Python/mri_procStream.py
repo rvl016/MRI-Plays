@@ -83,13 +83,13 @@ def manager( multi_queue, job_queue, pin, ppipe) :
         if status == "DONE" :
             index = int(msg[2])
             target = multi_queue.slots[SLOTS].queue[index].filename
-            print( "Worker %d: %s done!", % ( worker, target))
+            print( "Worker %d: %s done!" % ( worker, target))
             job_queue[index] = True
             working[worker] = False
         elif status == "ERROR" :
             error = ''.join( msg[2:])
-            print( "Worker %d: %s failed!", % ( worker, target))
-            print( "He leaved a message: %s", % error)
+            print( "Worker %d: %s failed!" % ( worker, target))
+            print( "He leaved a message: %s" % error)
             working[worker] = False
             while any( working) :
                 wait_worker( pin)

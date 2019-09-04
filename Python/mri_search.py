@@ -86,6 +86,7 @@ class Tree_Head :
         for i in levels :
             exec("self.%s = []" % i)
         self.attrib = "Tree_header"
+        self.level = "head"
         self.child = []
         self.parent = None
 # }}}        
@@ -249,7 +250,7 @@ class MRI_File :
 # }}}    
     def set_metadata( self) :
 # {{{
-        if not self.path_set : self.set_path()
+        if not self.path_set : self.get_path()
         self.metadata = self.Meta_data( self.filename + ".meta",\
                 self.path)
         return
@@ -304,21 +305,21 @@ def set_file_stats( pos, includePast = True) :
             pos.past_files = pos.set_past()
     return
 # }}}
-def search_MRI( head, exclude) :
+def search_MRI( head, excludeRules) :
 # {{{
-    def pruning( dirs, level, exclude) :
+    def pruning( dirs, level, excludeRules) :
 # {{{        
         if level == 3 :
             dirs[:] = [d for d in dirs if d in ["anat", "func"]]
-            dirs[:] = [d for d in dirs if d not in exclude[2]]
+            dirs[:] = [d for d in dirs if d not in excludeRules[2]]
 # Aqui na verdade é inclusão!! Feio...
         elif level == 1 :
             dirs[:] = [d for d in dirs if d.startswith("sub-")]
-            if exclude[1] :
-                dirs[:] = [d for d in dirs if d in exclude[1]]
+            if excludeRules[1] :
+                dirs[:] = [d for d in dirs if d in excludeRules[1]]
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!
         elif level == 0 :
-            dirs[:] = [d for d in dirs if d not in exclude[0]]
+            dirs[:] = [d for d in dirs if d not in excludeRules[0]]
         return dirs
 # }}}        
     def level_spawn( location, attrib_array, level) :
@@ -326,9 +327,9 @@ def search_MRI( head, exclude) :
         def sub_routine( location) :
 # {{{
             if location.attrib == "anat" :
-                if "T1w" in exclude[3] : 
+                if "T1w" in excludeRules[3] : 
                     location = location.spawn_child( "T2w")
-                elif "T2w" in exclude[3] :
+                elif "T2w" in excludeRules[3] :
                     location = location.spawn_child( "T1w")
                 else :    
                     location = location.spawn_child( "T1w")
@@ -355,12 +356,11 @@ def search_MRI( head, exclude) :
     location = head
     for root_dirs, dirs, files in os.walk( ".") :
         new_level = root_dirs.count( os.sep)  
-        dirs = pruning( dirs, new_level, exclude)
+        dirs = pruning( dirs, new_level, excludeRules)
         if dirs and new_level < 4 and new_level > 0 :
 # {{{        
             if new_level == 2 :
                 if yes_dialog : 
-                    pass
                     d.infobox( text = head.root + root_dirs)
                 else :
                     print( head.root + root_dirs)
@@ -409,4 +409,3 @@ def main( root_dir, excludeRules) :
     search_MRI( head, excludeRules)
     set_file_stats( head)
     return head
-

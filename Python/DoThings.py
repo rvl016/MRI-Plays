@@ -1,22 +1,27 @@
 #!/usr/bin/python3
 from dialog import Dialog
+import re
+import os
+import subprocess
 import mri_search
 import mri_queues
-import mri_takeNotes
+#import mri_takeNotes
 import mri_procStream
 
-#root_dir = "/home/ravi/HD2TB/Documents/IC/MRI"
-ROOT_DIR = "/home/rvl016/Documents/fMRI_data"
+ROOT_DIR = "/home/ravi/HD2TB/Documents/IC/MRI"
+OBSERVATE_DIR = "/home/ravi/HD2TB/Documents/IC/MRI-Plays/Bash/"
+NOTES_DIR = "/home/ravi/HD2TB/Documents/IC/MRI-Plays/Bash/"
+#ROOT_DIR = "/home/rvl016/Documents/fMRI_data"
+
 EXCLUDE = False
 MULTI_QUEUE = False
 
 searchMain = mri_search.main
 queuesMain = mri_queues.main
-takeNotesMain = mri_takeNotes.main
+#takeNotesMain = mri_takeNotes.main
 procStreamMain = mri_procStream.main
 
 d = Dialog()
-
 
 def makeExcludeRules( excludeRules) :
 # {{{    
@@ -91,14 +96,31 @@ def newJobDict( exclusionRules) :
 
     return jobDict
 # }}}        
-class Ready_jobs :
-
-    def __init__( self):
-
-
-def take_notes() :
-
-
+#class Ready_jobs :
+#    def __init__( self):
+def take_notes( which, multiQueue) :
+# {{{        
+    if which == "file" :
+        cmd = OBSERVATE_DIR + "observate.sh" + " file %s 1 %s"
+        for queue in multiQueue.slots :
+            # Obtendo endereço do subject
+            if queue.get_size() == 0 : continue
+            path = queue.queue[0].get_path()
+            path = re.split( r'/', path)
+            path = '/'.join( path[0:len(path) - 2]) 
+            files = ""
+            while not queue.is_empty() :
+                mriFile = queue.pop()
+                files = files + mriFile.filename + " "
+            subprocess.call( cmd % (path, files), shell = True)    
+            exit (1)
+        return
+    elif which == "ses" :
+        path = queue[0].get_path()
+        path = re.split( r'/', path)
+        path = '/'.join( path[0:len(path) - 2]) 
+        cmd = OBSERVATE_DIR + take_notes.sh + "-t ses -d %s"
+# }}}        
 
 def main() :
     mainMsg = "Select what thing you want to do:"
@@ -106,19 +128,26 @@ def main() :
             ("3", "Take notes with comparison"), ("4", "Take notes")]
     workType = d.menu( text = mainMsg, choices = choices)[1]
     workType = int( workType)
-    excludeRules = [[],[],[],[],[]]
+    dirMsg = "Type the root dir for MRI files:"
+    rootDir = d.inputbox( text = dirMsg, width = 80, init = ROOT_DIR)[1]
+    excludeRules = [[],["sub-A00000300"],["anat"],["T1w", "T2w"],[]]
     if EXCLUDE :
-        makeExcludeRules( excludeRules)
-    head = searchMain( root_dir, excludeRules)
-    multiQueue = queuesMain( head, multi)
+        excludeRules = makeExcludeRules( excludeRules)
+    head = searchMain( rootDir, excludeRules)
     if workType == 1 :
-        jobDict = newJobDict( exclusionRules)
+        multiQueue = queuesMain( head, "file", excludeRules,\
+                MULTI_QUEUE)
+        jobDict = newJobDict( excludeRules)
         jobQueue = procStreamMain( JobDict, multiQueue)
     elif workType == 2 :
+        multiQueue = queuesMain( head, "ses", excludeRules, MULTI_QUEUE)
+        take_notes( which = "ses")
     elif workType == 3 :
+        multiQueue = queuesMain( head, "sub", excludeRules, MULTI_QUEUE)
     elif workType == 4 :
-
-    else :
+        multiQueue = queuesMain( head, "sub", excludeRules, MULTI_QUEUE)
+        take_notes( which = "file", multiQueue = multiQueue)
     return
-        
 
+if __name__ == "__main__" :
+    main()
