@@ -168,6 +168,7 @@ class MRI_File :
         self.past_files = None
         self.metadata = []
         self.set_attribs()
+        self.path = None
         self.path_set = False
         self.past_files = None
         return

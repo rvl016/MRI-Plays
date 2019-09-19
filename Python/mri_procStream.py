@@ -36,7 +36,7 @@ def start_job( queue, jnum, cin, cout, job_dict) :
             os.rename( filename, "./tmp/" + filename)
             metafile = targ_ref.metadata.filename
             tmpMetaName = metafile[0:metafile.find(".")]
-            os.rename( metafile, tmpMetaName + "+" + \
+            os.rename( metafile, tmpMetaName + \
                     instructs["suffix"] + instructs["format"] + ".meta")
             return
 # }}}        

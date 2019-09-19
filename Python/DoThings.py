@@ -62,22 +62,23 @@ def newJobDict( exclusionRules) :
 # {{{       
         ok = ""
         while ok != "ok" :
-            exclusionRules[subtype] = { }
-            exclusionRules[subtype]["format"] = _format
-            exclusionRules[subtype]["suffix"] = suffix
-            exclusionRules[subtype]["command"] = d.inputbox(\
+            jobDict[subtype] = {}
+            jobDict[subtype]["format"] = _format
+            jobDict[subtype]["suffix"] = suffix
+            jobDict[subtype]["command"] = d.inputbox(\
                     text = mainMsg % ( subtype, "%s"), width = 80)[1]
             ok = d.yesno( okMsg % ("Command for " + subtype,\
-                    "\n" + exclusionRules[subtype]["command"]))
+                    "\n" + jobDict[subtype]["command"]))
         return 
 # }}}        
+    jobDict = {}
     formatMsg = "Choose format for output:"
     choices = [(".nii.gz", ""), (".nii", "")]
     suffixMsg = "Type suffix for output ('+blah'):"
-    okMsg = "%s: %s. Is that right?"
+    okMsg = "%s: %s\nIs that right?"
     ok = ""
     while ok != "ok" :
-        _format = d.menu( formatMsg, choices)[1]
+        _format = d.menu( text = formatMsg, choices = choices)[1]
         ok = d.yesno( okMsg % ("Format", _format))
     ok = ""
     while ok != "ok" :
@@ -98,10 +99,10 @@ def newJobDict( exclusionRules) :
 # }}}        
 #class Ready_jobs :
 #    def __init__( self):
-def take_notes( which, multiQueue) :
+def take_notes( which, compare, multiQueue) :
 # {{{        
     if which == "file" :
-        cmd = OBSERVATE_DIR + "observate.sh" + " file %s 1 %s"
+        cmd = OBSERVATE_DIR + "observate.sh" + " file %s %d %s"
         for queue in multiQueue.slots :
             # Obtendo endereço do subject
             if queue.get_size() == 0 : continue
@@ -112,16 +113,15 @@ def take_notes( which, multiQueue) :
             while not queue.is_empty() :
                 mriFile = queue.pop()
                 files = files + mriFile.filename + " "
-            subprocess.call( cmd % (path, files), shell = True)    
-            exit (1)
+            subprocess.call( cmd % (path, compare, files), shell = True)
         return
     elif which == "ses" :
         path = queue[0].get_path()
         path = re.split( r'/', path)
         path = '/'.join( path[0:len(path) - 2]) 
         cmd = OBSERVATE_DIR + take_notes.sh + "-t ses -d %s"
+        # TERMINAR
 # }}}        
-
 def main() :
     mainMsg = "Select what thing you want to do:"
     choices = [("1", "Process"), ("2", "Take session notes"), \
@@ -130,7 +130,8 @@ def main() :
     workType = int( workType)
     dirMsg = "Type the root dir for MRI files:"
     rootDir = d.inputbox( text = dirMsg, width = 80, init = ROOT_DIR)[1]
-    excludeRules = [[],["sub-A00000300"],["anat"],["T1w", "T2w"],[]]
+   #excludeRules = [["NMorphCH"],["sub-A00000300"],["func"],[],[]]
+    excludeRules = [[],[],[],[],[]]
     if EXCLUDE :
         excludeRules = makeExcludeRules( excludeRules)
     head = searchMain( rootDir, excludeRules)
@@ -138,16 +139,19 @@ def main() :
         multiQueue = queuesMain( head, "file", excludeRules,\
                 MULTI_QUEUE)
         jobDict = newJobDict( excludeRules)
-        jobQueue = procStreamMain( JobDict, multiQueue)
+       #jobQueue = procStreamMain( JobDict, multiQueue)
     elif workType == 2 :
         multiQueue = queuesMain( head, "ses", excludeRules, MULTI_QUEUE)
         take_notes( which = "ses")
     elif workType == 3 :
         multiQueue = queuesMain( head, "sub", excludeRules, MULTI_QUEUE)
+        take_notes( which = "file", compare = True,\
+                multiQueue = multiQueue)
     elif workType == 4 :
         multiQueue = queuesMain( head, "sub", excludeRules, MULTI_QUEUE)
-        take_notes( which = "file", multiQueue = multiQueue)
+        take_notes( which = "file", compare = False,\
+                multiQueue = multiQueue)
     return
 
-if __name__ == "__main__" :
-    main()
+#if __name__ == "__main__" :
+#    main()

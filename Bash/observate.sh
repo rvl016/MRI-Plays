@@ -28,21 +28,29 @@ create_pipes()
 update_afni()
 # {{{        
 {
-   echo "OIIIIIE"
    [[ -z ${PID_AFNI+x} ]] && kill $PID_AFNI
+   pkill afni
    [[ -z ${PID_PLUG+x} ]] && kill $PID_PLUG
+   pkill tail
    [[ -z ${PID_TAIL+x} ]] && kill $PID_TAIL
-   echo "OIIIIIE"
 ########################################################################
-   [[ $AFNI_COMPARE = 1 ]] && afni -yesplugout -R3 -com "OPEN_WINDOW B"\
-      &>/dev/null & 
-   [[ $AFNI_COMPARE = 0 ]] && afni -yesplugout -R2 -com \
+   if [[ $AFNI_COMPARE = 1 ]]; then 
+      afni -yesplugout -R3 -com "OPEN_WINDOW A geom=+0+\
+         $((2*${AFNI_SIZE}+22))" -com \
+         "OPEN_WINDOW B geom=+700+$((2*${AFNI_SIZE}+22))" &>/dev/null & 
+   fi
+   if [[ $AFNI_COMPARE = 0 ]]; then 
+      afni -yesplugout -R2 -com \
+         "OPEN_WINDOW A geom=+0+$((2*${AFNI_SIZE}+22))" -com \
          "OPEN_WINDOW A.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+0+22"\
          -com\
          "OPEN_WINDOW A.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+\
          ${AFNI_SIZE}+22" -com "OPEN_WINDOW A.sagittalimage geom=\
          ${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+22" &>/dev/null &
+   fi
+echo ===============================
    wait 
+echo ===============================
    [[ $? != 0 ]] && error_exit "Something went wrong with AFNI!"
    PID_AFNI=$(ps -e | awk '$4=="afni" {printf "%d",$1}')
    [[ $PID_AFNI = "" ]] && error_exit "AFNI PID could not be got!"
@@ -115,17 +123,19 @@ Show_interact()
    echo -e "OPEN_WINDOW A.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+0+22\n" > $in_afni
    echo -e "OPEN_WINDOW A.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+22\n" > $in_afni
    echo -e "OPEN_WINDOW A.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+22\n" > $in_afni
-   echo -e "OPEN_WINDOW B.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+1+$((${AFNI_SIZE} + 22))\n" > $in_afni
-   echo -e "OPEN_WINDOW B.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+$((${AFNI_SIZE} + 22))\n" > $in_afni
-   echo -e "OPEN_WINDOW B.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+$((${AFNI_SIZE} + 22))\n" > $in_afni
-   Notes $notetype $i
+   if [[ $AFNI_COMPARE = 1 ]]; then
+      echo -e "OPEN_WINDOW B.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+1+$((${AFNI_SIZE} + 22))\n" > $in_afni
+      echo -e "OPEN_WINDOW B.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+$((${AFNI_SIZE} + 22))\n" > $in_afni
+      echo -e "OPEN_WINDOW B.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+$((${AFNI_SIZE} + 22))\n" > $in_afni
+   fi
+  #Notes $notetype $i
+   read
 }
 # }}}        
 specs_process() 
 # {{{        
 {
    local i tmp 
-   declare -a fdirs 
    for (( i=0; i<${#files[@]}; i++ )); do
       fdirs[$i]=${files[$i]#*_}
       fdirs[$i]=${fdirs[$i]%%_*}
@@ -142,20 +152,21 @@ specs_process()
 # }}}        
 # main($1 = notetype[ses|file], $2 = directory [ses|sub], $3 = compare\
 #, $4 = files) 
-# {{{  
 argc=$#
 argv=($@)
 notetype=${argv[0]}
 dir=${argv[1]}
 AFNI_COMPARE=${argv[2]}
+echo $AFNI_COMPARE
+read
 declare -a files
+declare -a fdirs 
 for ((i = 3; i < $argc; i++)); do
    files[$((i - 3))]=${argv[$i]}
 done   
 create_pipes
 cd $dir
 [[ $notetype = "file" ]] && update_afni $AFNI_COMPARE && specs_process
-   
 for ((i = 0; i < ${#files[@]}; i++)); do
    Show_interact $i 
    [[ $cancel = 1 ]] && return 127
@@ -163,4 +174,3 @@ done
 rm $in_afni
 rm $out_plug
 exit 0
-# }}}        
