@@ -8,9 +8,9 @@ import mri_queues
 #import mri_takeNotes
 import mri_procStream
 
-ROOT_DIR = "/home/ravi/HD2TB/Documents/IC/MRI"
-OBSERVATE_DIR = "/home/ravi/HD2TB/Documents/IC/MRI-Plays/Bash/"
-NOTES_DIR = "/home/ravi/HD2TB/Documents/IC/MRI-Plays/Bash/"
+ROOT_DIR = "/backup/MRI"
+OBSERVATE_DIR = "/home/ravi/Git/MRI-Plays/Bash/"
+NOTES_DIR = "/home/ravi/Git/MRI-Plays/Bash/"
 #ROOT_DIR = "/home/rvl016/Documents/fMRI_data"
 
 EXCLUDE = False
@@ -139,7 +139,7 @@ def main() :
         multiQueue = queuesMain( head, "file", excludeRules,\
                 MULTI_QUEUE)
         jobDict = newJobDict( excludeRules)
-       #jobQueue = procStreamMain( JobDict, multiQueue)
+        jobQueue = procStreamMain( jobDict, multiQueue)
     elif workType == 2 :
         multiQueue = queuesMain( head, "ses", excludeRules, MULTI_QUEUE)
         take_notes( which = "ses")
@@ -153,5 +153,5 @@ def main() :
                 multiQueue = multiQueue)
     return
 
-#if __name__ == "__main__" :
-#    main()
+if __name__ == "__main__" :
+    main()
