@@ -8,7 +8,8 @@ import mri_queues
 #import mri_takeNotes
 import mri_procStream
 
-ROOT_DIR = "/backup/MRI"
+#ROOT_DIR = "/backup/MRI"
+ROOT_DIR = "/mnt/usb/MRI"
 OBSERVATE_DIR = "/home/ravi/Git/MRI-Plays/Bash/"
 NOTES_DIR = "/home/ravi/Git/MRI-Plays/Bash/"
 #ROOT_DIR = "/home/rvl016/Documents/fMRI_data"

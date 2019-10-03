@@ -26,8 +26,8 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
 #               cmd = re.sub( r'\b OUT \b', out_name, cmd)
                 return cmd
             else :
-                error = "ERROR Bad job dict formatation!"
-                pMsgQueue.put( [jnum, error])
+                error = "Bad job dict formatation!"
+                pMsgQueue.put( [jnum, "ERROR", error])
                 current_process().terminate()
 # }}}        
         def backup() :
@@ -41,8 +41,8 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
            #if not os.path.exists( "./tmp") :
            #    os.mkdir( "tmp")
            #os.rename( filename, "./tmp/" + filename)
-           #metafile = mriObj.metadata.filename
-           #tmpMetaName = metafile[0:metafile.find(".")]
+            metafile = mriObj.metadata.filename
+            tmpMetaName = metafile[0:metafile.find(".")]
            #os.rename( metafile, tmpMetaName + \
            #        instructs["suffix"] + instructs["format"] + ".meta")
             n = tmpMetaName+instructs["suffix"]+instructs["format"] + ".meta"
@@ -59,8 +59,8 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
         sleep( 5)
        #status = os.system( cmd)
        #if status != 0 :
-       #    error = "ERROR Something went wrong with process command!"
-       #    pMsgQueue.put( [jnum, error])
+       #    error = "Something went wrong with process command!"
+       #    pMsgQueue.put( [jnum, ERROR, error, mriObj.filename])
        #    current_process().terminate()
        #else :
        #    status = "DONE"
@@ -83,7 +83,7 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
             index = msg
             os.system( "echo 'Worker %d: Got job at %d.' >/dev/pts/%d" % \
                     (jnum, index , pts))
-            status = process( queue[index])
+            status = process( queue.queue[index])
             pMsgQueue.put( [jnum, status, index])
     current_process().terminate()
 # }}}        
@@ -92,11 +92,11 @@ def manager( multi_queue, job_queue, pMsgQueue, cMsgQueue) :
     def send_job( worker, next_job) :
 # {{{        
         print ( "Sending next job to worker %d, index %d." % \
-                worker, next_job)
+                ( worker, next_job))
         cMsgQueue[worker].put( next_job) 
         working[worker] = True
         next_job += 1
-        return
+        return next_job
 # }}}        
     def wait_worker( pMsgQueue) :
 # {{{        
@@ -107,12 +107,14 @@ def manager( multi_queue, job_queue, pMsgQueue, cMsgQueue) :
         status = msg[1]
         if status == "DONE" :
             index = msg[2]
-            target = multi_queue.slots[SLOTS].queue[index].filename
+            target = queue.queue[index].filename
             print( "Worker %d: %s done!" % ( worker, target))
             job_queue[index] = True
             working[worker] = False
         elif status == "ERROR" :
-            error = ''.join( msg[2:])
+            error = msg[2]
+            filename = msg[3]
+            target = queue.queue[index].filename
             print( "Worker %d: %s failed!" % ( worker, target))
             print( "He leaved a message: %s" % error)
             working[worker] = False
@@ -143,7 +145,7 @@ def manager( multi_queue, job_queue, pMsgQueue, cMsgQueue) :
                 if not working[i]: 
                     worker = i
                     break
-            send_job( worker, next_job)
+            next_job = send_job( worker, next_job)
 # }}}        
 def main( job_dict, multi_queue, observate = False) :
 # {{{        
