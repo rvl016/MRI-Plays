@@ -2,10 +2,12 @@
 import os
 import re
 import json
+import subprocess
 from dialog import Dialog
 
 levels = ( "study", "subject", "session", "type", "sub_type")
-yes_dialog = True
+yes_dialog = False
+mkTreeLog = False
 
 class Tree_node :
 # {{{
@@ -115,6 +117,7 @@ class MRI_File :
            #self.instances = [None]
             self.get_instances()
             self.get_json_info( self.json_file)
+            self.get_logFile()
             return
 # }}}
         def get_instances( self) :
@@ -124,18 +127,19 @@ class MRI_File :
             metafile.close()
             data = [i.rstrip( "\n") for i in data]
             lenght = len( data)
-            data = [re.split( r' ', i) for i in data]
+            data = [re.split( r'\ ', i) for i in data]
             if not data :
                 self.flags = []
                 self.status = None
                 self.comment = None
                 print( "Empty metafile!")
+                print( "\t=>", metafile)
             else :    
                 self.flags = list( filter( \
                         None, re.split( r'\+', data[-1][0])))
                 self.status = int( data[-1][1])
-                comment = data[0][2]
-                for i in range( 1, lenght) :
+                comment = ""
+                for i in range( lenght) :
                     comment = comment + "+" + data[i][2]
                 self.comment = comment
             return
@@ -143,9 +147,21 @@ class MRI_File :
         def get_json_info( self, json_file) :
 # {{{        
             os.chdir( self.path)
-            info = open( json_file)
+            #print( json_file)
+            info = open( json_file, "r")
             self.json = json.load( info)
+            info.close()
             return
+# }}}
+        def get_logFile( self) :
+# {{{
+            if self.filename.find( "+") != -1 :
+                baseName = self.filename[0:self.filename.index( "+")]
+            else :
+                baseName = self.filename[0:self.filename.index( ".")]
+            self.logFile = baseName + ".log"
+            return
+
 # }}}
 # }}}
     class Attribs :
@@ -168,16 +184,20 @@ class MRI_File :
         self.past_files = None
         self.metadata = []
         self.set_attribs()
-        self.path = None
+        self.set_flags()
+        self.path = ""
         self.path_set = False
         self.past_files = None
+        self.level = "file"
         return
 # }}}        
     def get_path( self, absolute = True) :   
 # {{{            
         if not self.path_set :
-            location = self.parent
-            path = ""
+            location = self
+            while location.level != "sub_type" :
+                location = location.parent
+            path = self.path
             while type( location.parent) != Tree_Head :
                 location = location.parent
                 path = "/" + location.attrib + path
@@ -220,6 +240,7 @@ class MRI_File :
         filename = self.filename
         if filename.find( "+") != -1 :
             flags = filename[filename.index( "+"):len( filename)]
+            flags = flags[1:flags.index( ".")]
             flags = re.split( r'\+', flags)
         else :
             flags = None
@@ -254,6 +275,7 @@ class MRI_File :
         if not self.path_set : self.get_path()
         self.metadata = self.Meta_data( self.filename + ".meta",\
                 self.path)
+        self.set_tslice_data()
         return
 # }}}
     def dump_attribs( self) :
@@ -261,6 +283,38 @@ class MRI_File :
         if not self.attribs_set : 
             self.set_attribs()
         return ( [self.run, self.echo, self.flags, self.past])
+# }}}
+    def set_tslice_data( self, tsliceGen = False) :
+# {{{
+        if self.attribs.type != "func" :
+            return
+        if tsliceGen :
+            os.chdir( self.get_path())
+            tsliceFile = self.metadata.filename + ".tslice"
+            if not os.path.isfile( tsliceFile) :
+                ptr = open( tsliceFile, 'w') 
+                for num in self.metadata.json["SliceTiming"] :
+                    ptr.write( str( (1000 * float( num))) + " ")
+                ptr.close()
+            self.metadata.tsliceFile = tsliceFile
+        if self.metadata.comment.find( 'remove_t=..') != -1 :
+            # De onde vem esse 2? Da puta que pariu.
+            cutVol = int( re.search( 'remove_t=..(\d+)',\
+                    self.metadata.comment).group( 1)) + 2
+            self.metadata.cutVol = cutVol
+        else :
+            # De onde vem esse 3? Da puta que pariu.
+            cutVol = 3
+            self.metadata.cutVol = cutVol
+        if self.metadata.comment.find( '+_t=') != -1 :
+            self.metadata.refVol = int( re.search( '\+_t=(\d+)',\
+                    self.metadata.comment).group( 1)) - cutVol
+        else :
+            getTcmd = "3dinfo -nt " + self.filename
+            tmp = subprocess.check_output( getTcmd, shell = True)
+            self.metadata.refVol = int( (int( tmp) - cutVol)  / 2)
+        return
+                
 # }}}
     def __del__( self) :
 # {{{
@@ -276,23 +330,30 @@ class Past_MRI_File :
         self.filename = filename
         self.attribs = self.parent.attribs
         self.parent.past.append( self)
+        self.path = "/tmp"
+        self.path_set = False
+        self.level = "pastFile"
         return
 # }}}        
     def set_flags( self) :
-        MRI_File.set_flags()
+        MRI_File.set_flags( self)
+    def get_path( self) :
+        return MRI_File.get_path( self)
 # }}}            
 def print_tree( pos, level = 0) :
 # {{{
-    for a in range( 0, level) : print( "| ", end = '')    
+    for a in range( 0, level) : 
+        tree.write( "| ")    
     if level < 6 :
-        print( "-o-", pos.attrib, sep = "")
+        tree.write( "-o-%s\n" % pos.attrib)
         for i in pos.child :
             print_tree( i, level+1)
     else :
-        print( "-o-", pos.filename, sep = "")
+        tree.write( "-o-%s\n" % pos.filename)
         for i in pos.past :
-            for a in range( 0, level+1) : print( "| ", end = '')    
-            print( "-o-", i.filename, sep = "")
+            for a in range( 0, level+1) : 
+                tree.write( "| ")    
+            tree.write( "-o-%s\n" % i.filename)
     return
 # }}}
 def set_file_stats( pos, includePast = True) :
@@ -347,6 +408,11 @@ def search_MRI( head, excludeRules) :
         location = location.parent
         return location
 # }}}        
+    def getTarg(location, root_dirs ) :
+        attrib = os.path.split( root_dirs)[1]
+        while location.attrib != attrib :
+            location = location.brother
+        return location
     os.chdir( head.root)
     if yes_dialog :
         d = Dialog()
@@ -362,21 +428,24 @@ def search_MRI( head, excludeRules) :
 # {{{        
             if new_level == 2 :
                 if yes_dialog : 
-                    d.infobox( text = head.root + root_dirs)
+                    d.infobox( text = head.root + root_dirs[1:])
                 else :
-                    print( head.root + root_dirs)
+                    print( head.root + root_dirs[1:])
             if new_level > level :
                 level += 1
                 location = location.child[0]
+                location = getTarg(location, root_dirs )
                 location = level_spawn( location, dirs, level)
             elif new_level < level :
                 while level != new_level :
                     location = location.parent
                     level -= 1
                 location = location.brother 
+                location = getTarg(location, root_dirs )
                 location = level_spawn( location, dirs, level)
             else :  
                 location = location.brother
+                location = getTarg(location, root_dirs )
                 location = level_spawn( location, dirs, level)
 # }}}        
         elif new_level == 4 :
@@ -409,4 +478,10 @@ def main( root_dir, excludeRules) :
     head = Tree_Head( root_dir)
     search_MRI( head, excludeRules)
     set_file_stats( head)
+    if mkTreeLog :
+        global tree
+        os.chdir( head.root)
+        tree = open( "treeLog", "w")
+        print_tree( head)
+        tree.close()
     return head

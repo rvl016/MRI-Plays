@@ -41,28 +41,32 @@ class MultiQueue :
             self.slots.append( self.Queue())
         return
 # }}}        
-    def push( self, new, i) :
+    def push( self, new, queueNum) :
 # {{{        
-        self.slots[i].push( new)
+        self.slots[queueNum].push( new)
         return
 # }}}        
     def newQueue( self) :
         self.slots.append( self.Queue())
         return
 # }}}        
-def mainDFS( head, mode, excludeRules, multi) :
+def mainDFS( head, mode, excludeRules, multi, filterDoneNts) :
 # {{{        
     def dfsR( ptr) :
 # {{{        
         nonlocal cnt 
         nonlocal lvlCnt
         if isinstance( ptr, MRI_File) :
+            if ptr.metadata.status in excludeRules[4] : 
+                return
+            if filterDoneNts and \
+                    set( ptr.flags) == set( ptr.metadata.flags) :
+                return
             cnt += 1
-            if not ptr.metadata.status in excludeRules[4] : 
-                if multi :
-                    multiQueue.push( ptr, cnt % CPU_COUNT)
-                else :
-                    multiQueue.push( ptr, lvlCnt)
+            if multi :
+                multiQueue.push( ptr, cnt % CPU_COUNT)
+            else :
+                multiQueue.push( ptr, lvlCnt)
         else :
             if mode == "sub" and ptr.level == "subject" :
                 multiQueue.newQueue()
@@ -86,6 +90,7 @@ def mainDFS( head, mode, excludeRules, multi) :
     dfsR( head)
     return multiQueue
 # }}}        
-def main( head, mode, excludeRules, multi = False) :    
-    multiQueue = mainDFS( head, mode, excludeRules, multi)
+def main( head, mode, excludeRules, multi, filterDoneNts = False) :    
+    multiQueue = mainDFS( head, mode, excludeRules, \
+            multi, filterDoneNts)
     return multiQueue

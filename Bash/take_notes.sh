@@ -107,20 +107,29 @@ Specs_proccess()
 ##############################  Dialog_interface_file {{{2
 Dialog_interface_file()
 {
-    #### $1 = sub
-    #### $2 = ses
-    #### $3 = type
-    #### $4 = sub_type
-    #### $5 = run
-    #### $6 = echo
-    
+    #    $1 = sub
+    #    $2 = ses
+    #    $3 = type
+    #    $4 = sub_type
+    #    $5 = run
+    #    $6 = echo
     info=($(3dinfo -orient -obliquity -adi -adj -adk -voxvol -n4 $filename))
 
-    [[ $last = 1 ]] && note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}\nLast flags: $last_flags | Last status: $last_status" 15 90 "$last_note" ) || note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}" 14 90)
+    if [[ $last = 1 ]]; then
+        msg="Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}\nLast flags: $last_flags | Last status: $last_status\nLast note: $last_note" 
+        note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "$msg" 15 90 "Ok" ) 
+    else
+        msg="Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}" 
+        note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "$msg" 14 90 "Ok")
+    fi
 
     [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 1
 
-    [[ $last = 1 ]] && status=$(dialog --stdout --backtitle "Taking notes on $filename" --title "Select an status for the current filename:" --cancel-label "Ignore File" --default-item "$last_status" --menu "Note taken: $note" 7 100 0 0 "Good to go" 1 "Some problem" 2 "A lot of problem (some step needs to be redone)" 3 "Unusable (declare dead)") || status=$(dialog --stdout --backtitle "Taking notes on $filename" --title "Select an status for the current filename:" --cancel-label "Ignore File" --menu "Note taken: $note" 7 100 0 0 "Good to go" 1 "Some problem" 2 "A lot of problem (some step needs to be redone)" 3 "Unusable (declare dead)")
+    if [[ $last = 1 ]]; then
+        status=$(dialog --stdout --backtitle "Taking notes on $filename" --title "Select an status for the current filename:" --cancel-label "Ignore File" --default-item "$last_status" --menu "Note taken: $note" 7 100 0 0 "Good to go" 1 "Some problem" 2 "A lot of problem (some step needs to be redone)" 3 "Unusable (declare dead)")
+    else
+        status=$(dialog --stdout --backtitle "Taking notes on $filename" --title "Select an status for the current filename:" --cancel-label "Ignore File" --menu "Note taken: $note" 7 100 0 0 "Good to go" 1 "Some problem" 2 "A lot of problem (some step needs to be redone)" 3 "Unusable (declare dead)")
+    fi
 
     
     [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 1
@@ -198,7 +207,7 @@ done
 [[ $sesnote = 0 ]] && [[ $filenote = 0 ]] && [[ $lognote = 0 ]] && exit_error "Nothing to do here!" 
 [[ $filenote = 1 ]] && [[ ! $filename ]] && exit_error "No filename provided!"
 ##############################  }}}1
-##############################  Main {{{1
+#- main ---------------------------------------------------------------#
 if [[ $filenote = 1 ]]; then
     cd $dir 
     [[ $? != 0 ]] && exit_error "Directory $dir could not be accessed!"
@@ -220,4 +229,3 @@ fi
 
 #fi
 exit 0
-##############################  }}}
