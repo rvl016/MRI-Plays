@@ -3,9 +3,11 @@ import re
 from time import sleep
 from multiprocessing import Process, Queue as MsgQueue, current_process
 from datetime import datetime
+from mri_heuristics import SkullStrip
+from mri_heuristics import mcflirt
+from dialog import Dialog
 
 CPU_COUNT = os.cpu_count()
-SLOTS = 0
 log = '/dev/null'
 
 def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
@@ -14,9 +16,9 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
 # {{{        
         def get_cmd( instructs) :
 # {{{        
-            nonlocal outName
+            global outName
             cmd = instructs["command"]
-            filename = mriObj.filename
+            filename = eval( instructs["filename"] + ".filename")
             outName = filename[0:filename.find(".")]
             outName = outName + instructs["suffix"] + \
                     instructs["format"]
@@ -26,6 +28,8 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
                 i = 0
                 for subst in instructs["substitute"] :
                     token = eval( subst)
+                    if not token :
+                        return None
                     if type( token) == list :
                         tmp = ""
                         for num in token :
@@ -37,26 +41,35 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
                 return cmd
             else :
                 error = "Bad job dict formatation!"
-                pMsgQueue.put( [jnum, "ERROR", error])
-                current_process().terminate()
+                pMsgQueue.put( [jnum, "ERROR", index, error, \
+                        mriObj.filename])
+                return False
 # }}}        
-        def backup() :
+        def backup( mriObj) :
 # {{{        
-            filename = mriObj.filename
-            os.system( "echo 'Worker %d: Backup for %s.' >>%s" %\
+            filename = eval( instructs["filename"] + ".filename")
+            os.system( "echo 'Worker %d: Backup for %s.' >>%s" % \
                     (jnum, filename , log))
             if not os.path.exists( "./tmp") :
                 os.mkdir( "tmp")
             os.rename( filename, "./tmp/" + filename)
-            metafile = mriObj.metadata.filename
+            metafile = eval( instructs["filename"] + \
+                    ".metadata.filename")
             tmpMetafile = metafile[0:metafile.find(".")]
             newMetafile = tmpMetafile + instructs["suffix"] + \
                     instructs["format"] + ".meta"
             os.rename( metafile, newMetafile)
-            os.system( "echo 'Worker %d: new metafile %s.' >>%s" %\
+            os.system( "echo 'Worker %d: new metafile %s.' >>%s" % \
                     (jnum, newMetafile, log))
             return
 # }}}        
+        def moveAux() :
+# {{{        
+            if not os.path.exists( "./aux") :
+                os.mkdir( "aux")
+            os.rename( outName, "./aux/" + outName)
+            return
+# }}}
         def prepareLog() :
 # {{{        
             filename = mriObj.filename
@@ -73,23 +86,32 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
             return fileLog
 # }}}        
         path = mriObj.get_path()
-        os.system( "echo 'Worker %d: cd to  %s.' >>%s" %\
+        os.system( "echo 'Worker %d: cd to  %s.' >>%s" % \
                 (jnum, path, log))
         os.chdir( path)
         instructs = job_dict[mriObj.attribs.sub_type]
+        if "mriObj" != instructs["filename"] :
+            os.chdir( "aux")
         cmd = get_cmd( instructs)
+        if not cmd :
+            status = "ERROR"
+            return status
         os.system( "echo 'Worker %d: %s.' >>%s" % \
                 (jnum, cmd, log))
         fileLog = prepareLog()
         status = os.system( cmd + " 1>>%s 2>&1" % fileLog )
-        check = os.file.ispath( "./" + outName)
+        check = os.path.isfile( outName) or os.path.isdir( outName)
         if status != 0 or not check :
+            status = "ERROR"
             error = "Something went wrong with process command!"
-            pMsgQueue.put( [jnum, ERROR, error, mriObj.filename])
-            current_process().terminate()
+            pMsgQueue.put( [jnum, "ERROR", index, error, mriObj.filename])
         else :
+            if instructs['backup'] :
+                backup( mriObj)
+            if instructs['aux'] and not \
+                    os.getcwd().endswith( "/aux") :
+                moveAux()
             status = "DONE"
-            backup()
         return status
 # }}}        
     os.system( "echo 'Worker %d Spawned.' >>%s" % \
@@ -101,14 +123,14 @@ def start_job( queue, jnum, cMsgQueue, pMsgQueue, job_dict) :
         if msg == "Out!" :
             os.system( "echo 'Worker %d: Exit message!.' >>%s"\
                     % (jnum, log))
-            break
+            os._exit( 0)
         else :
             index = msg
             os.system( "echo 'Worker %d: Got job at %d.' >>%s"\
                     % (jnum, index , log))
             status = process( queue.queue[index])
-            pMsgQueue.put( [jnum, status, index])
             if status == "DONE" :
+                pMsgQueue.put( [jnum, status, index])
                 os.system( "echo 'Worker %d: Done index %d!.'\
                         >>%s" % (jnum, index, log))
             else :
@@ -141,12 +163,13 @@ def manager( queue, job_queue, pMsgQueue, cMsgQueue) :
             job_queue[index] = True
             working[worker] = False
         elif status == "ERROR" :
-            error = msg[2]
-            filename = msg[3]
-            target = queue.queue[index].filename
+            index = msg[2]
+            error = msg[3]
+            target = msg[4]
             print( "Worker %d: %s failed!" % ( worker, target))
             print( "He leaved a message: %s" % error)
             working[worker] = False
+            cMsgQueue[worker].put( "Out!")
             while any( working) :
                 wait_worker( pMsgQueue)
             exit( 1)
@@ -180,15 +203,19 @@ def manager( queue, job_queue, pMsgQueue, cMsgQueue) :
             return job_queue
         
 # }}}        
-def main( job_dict, multi_queue, observate = False) :
+def main( job_dict, queue, observate = False) :
 # {{{        
-    queue = multi_queue.slots[SLOTS]
+    d = Dialog()
+    msg = "How many workers do you wish sir?"
+    procThreads = \
+            int( d.inputbox( msg, width = 80, init = str( CPU_COUNT))[1])
+    if procThreads > CPU_COUNT :
+        procThreads = CPU_COUNT
     job_queue = [False] * queue.get_size()
     pMsgQueue = MsgQueue()
     cMsgQueue = []
-   #pin, cout = os.pipe()
     print( "Prepare to fork!")
-    for i in range( CPU_COUNT) :
+    for i in range( procThreads) :
         childQueue = MsgQueue()
         Process( target = start_job, args = ( queue, i, childQueue, \
                 pMsgQueue, job_dict)).start()
@@ -196,6 +223,3 @@ def main( job_dict, multi_queue, observate = False) :
     job_queue = manager( queue, job_queue, pMsgQueue, cMsgQueue)
     return job_queue
 # }}}        
-            # job_dict = { 'T1w': job1, 'T2w': job2, 'rest': job3}
-            # job_dict["T1w"] = { 'command' :"blablabla in bla out"
-            # 'suffix' : "blabla", 'format' : ".nii.gz", }

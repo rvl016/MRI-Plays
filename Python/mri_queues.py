@@ -50,17 +50,24 @@ class MultiQueue :
         self.slots.append( self.Queue())
         return
 # }}}        
-def mainDFS( head, mode, excludeRules, multi, filterDoneNts) :
+def mainDFS( head, mode, excludeRules, multi) :
 # {{{        
     def dfsR( ptr) :
 # {{{        
         nonlocal cnt 
         nonlocal lvlCnt
         if isinstance( ptr, MRI_File) :
-            if ptr.metadata.status in excludeRules[4] : 
+            if ptr.attribs.type in excludeRules[2] :
                 return
-            if filterDoneNts and \
-                    set( ptr.flags) == set( ptr.metadata.flags) :
+            if ptr.attribs.sub_type in excludeRules[3] :
+                return
+            if ptr.attribs.sub_type == 'T1w' and not ptr.choosen :
+                return
+            if ptr.metadata.status in excludeRules[4] :
+                return
+            if excludeRules[6] != '' and not eval( excludeRules[6]) :
+                return
+            if excludeRules[7] != '' and not eval( excludeRules[7]) :
                 return
             cnt += 1
             if multi :
@@ -90,7 +97,7 @@ def mainDFS( head, mode, excludeRules, multi, filterDoneNts) :
     dfsR( head)
     return multiQueue
 # }}}        
-def main( head, mode, excludeRules, multi, filterDoneNts = False) :    
+def main( head, mode, excludeRules, multi) :    
     multiQueue = mainDFS( head, mode, excludeRules, \
-            multi, filterDoneNts)
+            multi)
     return multiQueue

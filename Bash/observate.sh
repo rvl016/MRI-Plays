@@ -1,7 +1,8 @@
 #!/bin/bash
 NOTE_DIR="/home/ravi/HD2TB/Documents/IC/MRI-Plays/Bash"
-NOTE_DIR="/home/ravi/Git/MRI-Plays/Bash"
-AFNI_SIZE=300
+#NOTE_DIR="/home/ravi/Git/MRI-Plays/Bash"
+TEMPLPATH="/home/ravi/HD2TB/Documents/IC/MNI_Template/"
+AFNI_SIZE=400
 DEBUG_AFNI="/dev/null"
 DEBUG=0
 
@@ -62,14 +63,19 @@ update_afni()
    pkill tail
    [[ -z ${PID_TAIL+x} ]] && kill $PID_TAIL &>/dev/null
 ########################################################################
+   if [[ $AFNI_COMPARE = 2 ]]; then 
+      afni -YESplugouts -R3 -purge -com "OPEN_WINDOW A \
+         geom=+0+$((${AFNI_SIZE}+22))" ./ ${TEMPLPATH} &>$DEBUG_AFNI & 
+   fi
    if [[ $AFNI_COMPARE = 1 ]]; then 
-      afni -YESplugouts -R3 -com "OPEN_WINDOW A geom=+0+\
-         $((2*${AFNI_SIZE}+22))" -com \
+      afni -YESplugouts -R3 -purge -com "OPEN_WINDOW A \
+         geom=+0+$((2*${AFNI_SIZE}+22))" -com \
          "OPEN_WINDOW B geom=+700+$((2*${AFNI_SIZE}+22))"\
-	 &>$DEBUG_AFNI & 
+         ./ ${TEMPLPATH} &>$DEBUG_AFNI & 
+      sleep 4
    fi
    if [[ $AFNI_COMPARE = 0 ]]; then 
-      afni -YESplugouts -R2 -com \
+      afni -YESplugouts -R2 -purge -com \
          "OPEN_WINDOW A geom=+0+$((2*${AFNI_SIZE}+22))" -com \
          "OPEN_WINDOW A.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+0+22"\
          -com\
@@ -79,7 +85,9 @@ update_afni()
 	 &>$DEBUG_AFNI &
    fi
    [[ $? != 0 ]] && error_exit "Something went wrong with AFNI!"
-   dialog --msgbox "Press return when AFNI is ready: " 5 40
+  #dialog --msgbox "Only ${remaining} left! =]\nPress return when AFNI\
+#is ready: " 7 40
+   dialog --infobox "Only ${remaining} left! =]" 7 40
    PID_AFNI=$(ps -e | awk '$4=="afni" {printf "%d",$1}')
    [[ $PID_AFNI = "" ]] && error_exit "AFNI PID could not be got!"
 ########################################################################
@@ -92,11 +100,6 @@ update_afni()
    PID_TAIL=$! 
    wait $PLUGOUT_CHECK
    echo "Plugout awnsered!"
-#   echo -e "OPEN_WINDOW A.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+0+22\n" > $in_afni
-#   echo -e "OPEN_WINDOW A.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+22\n" > $in_afni
-#   echo -e "OPEN_WINDOW A.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+22\n" > $in_afni
-#    [[ $AFNI_COMPARE = 1 ]] && echo -e "OPEN_WINDOW B\n" > $in_afni
-   
    PID_PLUG=$(ps -e | awk '$4=="plugout_drive" {printf "%d",$1}')
 }
 # }}}        
@@ -111,20 +114,17 @@ Notes()
       ret=$?
    fi
    if [[ $notetype = "file" ]]; then    
-      cd ${fdirs[$i]}
-      echo $(pwd)
+      path=$(dirname $(find . -type f | grep '/'${files[$i]}'$'))
+      path=${dir}${path#*.}
       if [[ $ignore_notes = 1 ]]; then
-	    check_notes file ${i} 
+	      check_notes file ${i} 
          if [[ $? = 0 ]]; then 
-            $NOTE_DIR/take_notes.sh --type file --file ${files[$i]}\
-                  --directory $(pwd)
+            $NOTE_DIR/take_notes.sh file ${path}/${files[$i]}
          fi
       else    
-         $NOTE_DIR/take_notes.sh --type file --file ${files[$i]}\
-            --directory $(pwd) 
+         $NOTE_DIR/take_notes.sh file ${path}/${files[$i]}
       fi     
       ret=$?
-      cd -
    fi    
    [[ $ret != 0 ]] && error_exit \
       "Something went wrong with 'take_notes.sh'!"
@@ -141,27 +141,27 @@ Show_interact()
       echo error_exit "File ${files[$i]#*/} is in wrong path! \
             (Subject: ${subject}, Session: ${ses})"
    fi
-   sendPlugcmd "SWITCH_DIRECTORY A.${fdirs[$i]}\n"
-   if [[ $AFNI_COMPARE = 1 ]]; then
-      sendPlugcmd "SWITCH_DIRECTORY B.${fdirs[$i]}/tmp\n"
+   if [[ $AFNI_COMPARE -le 1 ]]; then
+      sendPlugcmd "SWITCH_DIRECTORY A.All_Datasets\n"
+      sendPlugcmd "SWITCH_UNDERLAY A.${files[$(($i+1))]}\n"
    fi
-   sendPlugcmd "SWITCH_UNDERLAY A.${files[$i]}\n"
    if [[ $AFNI_COMPARE = 1 ]]; then
-      if [[ ${files[$i]%+*} = ${files[$i]} ]]; then
-         echo "File ${files[$i]} is raw! No comparison."
-      else
-         sendPlugcmd "SWITCH_UNDERLAY B.${files[$i]%+*}.nii.gz\n" 
-      fi   
+      sendPlugcmd "SWITCH_DIRECTORY B.All_Datasets\n"
+      sendPlugcmd "SWITCH_UNDERLAY B.${files[$(($i))]}\n" 
+      sendPlugcmd "OPEN_WINDOW B.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+1+$((${AFNI_SIZE} + 22))\n"
+      sendPlugcmd "OPEN_WINDOW B.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+$((${AFNI_SIZE} + 22))\n"
+      sendPlugcmd "OPEN_WINDOW B.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+$((${AFNI_SIZE} + 22))\n"
+      sendPlugcmd "SET_DICOM_XYZ B 0 0 0"
+   fi
+   if [[ $AFNI_COMPARE = 2 ]]; then
+      sendPlugcmd "SWITCH_DIRECTORY A.All_Datasets\n"
+      sendPlugcmd "SWITCH_OVERLAY A.${files[$(($i+1))]}\n"
+      sendPlugcmd "SWITCH_UNDERLAY A.${files[$(($i))]}\n" 
    fi
    sendPlugcmd "OPEN_WINDOW A.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+0+22\n" 
    sendPlugcmd "OPEN_WINDOW A.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+22\n"
    sendPlugcmd "OPEN_WINDOW A.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+22\n"
-
-   if [[ $AFNI_COMPARE = 1 ]]; then
-      sendPlugcmd "OPEN_WINDOW B.axialimage geom=${AFNI_SIZE}x${AFNI_SIZE}+1+$((${AFNI_SIZE} + 22))\n"
-      sendPlugcmd "OPEN_WINDOW B.coronalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+${AFNI_SIZE}+$((${AFNI_SIZE} + 22))\n"
-      sendPlugcmd "OPEN_WINDOW B.sagittalimage geom=${AFNI_SIZE}x${AFNI_SIZE}+$((2*${AFNI_SIZE}))+$((${AFNI_SIZE} + 22))\n"
-   fi
+   sendPlugcmd "SET_DICOM_XYZ A 0 0 0"
    Notes $notetype $i
 }
 # }}}        
@@ -184,22 +184,26 @@ specs_process()
 }    
 # }}}        
 # main($1 = notetype[ses|file], $2 = directory [ses|sub], $3 = compare\
-#, $4 = files) 
+#, $4 = remaining, $5 = files) 
 argc=$#
 argv=($@)
 notetype=${argv[0]}
 dir=${argv[1]}
 AFNI_COMPARE=${argv[2]}
+remaining=${argv[3]}
 declare -a files
 declare -a fdirs 
-for ((i = 3; i < $argc; i++)); do
-   files[$((i - 3))]=${argv[$i]}
+for ((i = 4; i < $argc; i++)); do
+   files[$((i - 4))]=${argv[$i]}
 done   
 create_pipes
 cd $dir
 [[ $notetype = "file" ]] && update_afni $AFNI_COMPARE && specs_process
 for ((i = 0; i < ${#files[@]}; i++)); do
    Show_interact $i 
+   if [[ $AFNI_COMPARE > 0 ]]; then
+      let "i++"
+   fi
 done
 rm $in_afni
 rm $out_plug

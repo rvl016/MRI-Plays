@@ -117,13 +117,19 @@ Dialog_interface_file()
 
     if [[ $last = 1 ]]; then
         msg="Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}\nLast flags: $last_flags | Last status: $last_status\nLast note: $last_note" 
-        note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "$msg" 15 90 "Ok" ) 
+#       note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "$msg" 15 90 "Ok" ) 
+        note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Select accordingly:" --cancel-label "Ignore File" --checklist "$msg" 24 90 20 "small cut above" "" "" "small cut under" "" "" "little extrapolation above" "" "" "some cut above" "" "" "some extrapolation above" "" "" "little extrapolation under" "" "" "some extrapolation under" "" "" "neck extrapolation" "" "" "big cut above" "" "" "big extrapolation under" "" "" "eyes extrapolation" "" "" "some cut under" "" "")
     else
         msg="Subject: $1\nSession: $2\nType: $3\nSub-Type: $4\nRun: $5\nEcho: $6\nOrientation: ${info[0]} | Obliquity: ${info[1]}\nVoxel dimensions: [${info[2]},${info[3]},${info[4]}] - ${info[5]}\nTotal size in voxels: ${info[6]}x${info[7]}x${info[8]} | Time poins: ${info[9]}" 
         note=$(dialog --stdout --backtitle "Taking notes on $filename..." --title "Type an observation over the current file:" --cancel-label "Ignore File" --inputbox "$msg" 14 90 "Ok")
     fi
 
-    [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 1
+    [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 0
+
+    note=$(echo $note | sed 's/" "/ + /g' | sed 's/"//g')
+    if [[ $note = "" ]]; then
+       note="ok"
+    fi
 
     if [[ $last = 1 ]]; then
         status=$(dialog --stdout --backtitle "Taking notes on $filename" --title "Select an status for the current filename:" --cancel-label "Ignore File" --default-item "$last_status" --menu "Note taken: $note" 7 100 0 0 "Good to go" 1 "Some problem" 2 "A lot of problem (some step needs to be redone)" 3 "Unusable (declare dead)")
@@ -132,7 +138,7 @@ Dialog_interface_file()
     fi
 
     
-    [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 1
+    [[ $? = 1 ]] && dialog --backtitle "Taking notes on $filename" --title "Are you sure you want to abort this note?" --yesno "" 4 60 && exit 0
 
     dialog --backtitle "Taking notes on $filename" --title "Is it right?" --yesno "Status: $status \nNote: $note" 6 100
     go=$?
@@ -171,44 +177,66 @@ Dialog_interface_ses()
 ##############################  }}}2
 ##############################  }}}1
 ##############################  Input processing {{{1
+#while [ "$1" != "" ]; do 
+#    echo "##############" $1
+#    case $1 in 
+#        
+#        -f | --file )                   shift
+#                                        filename=$1
+#                                        [[ ! $filename ]] && exit_error "--file: Missing filename"
+#                                        ;;
+#        -t | --type )                   shift
+#                                        obs_type=$1
+#                                        case $obs_type in 
+#                                            all )           filenote=1
+#                                                            sesnote=1
+#                                                            lognote=1
+#                                                            ;;
+#                                            nolog )         filenote=1
+#                                                            sesnote=1
+#                                                            ;;
+#                                            file )          filenote=1
+#                                                            ;;
+#                                            ses )           sesnote=1
+#                                                            ;;
+#                                            log )           lognote=1
+#                                        esac
+#                                        ;;
+#       #-d | --directory )              shift
+#       #                                dir=$1
+#       #                                echo "!!!!!!" $dir
+#       #                                ;;
+#        * )                             exit_error "Parameter $1 does not exist!"  
+#    esac
+#    shift
+#done    
 
-while [ "$1" != "" ]; do 
-    case $1 in 
-        
-        -f | --file )                   shift
-                                        filename=$1
-                                        [[ ! $filename ]] && exit_error "--file: Missing filename"
-                                        ;;
-        -t | --type )                   shift
-                                        obs_type=$1
-                                        case $obs_type in 
-                                            all )           filenote=1
-                                                            sesnote=1
-                                                            lognote=1
-                                                            ;;
-                                            nolog )         filenote=1
-                                                            sesnote=1
-                                                            ;;
-                                            file )          filenote=1
-                                                            ;;
-                                            ses )           sesnote=1
-                                                            ;;
-                                            log )           lognote=1
-                                        esac
-                                        ;;
-        -d | --directory )              shift
-                                        dir=$1
-                                        ;;
-        * )                             exit_error "Parameter $1 does not exist!"  
-    esac
-    shift
-done    
+obs_type=$1
+case $obs_type in 
+    all )           filenote=1
+                    sesnote=1
+                    lognote=1
+                    ;;
+    nolog )         filenote=1
+                    sesnote=1
+                    ;;
+    file )          filenote=1
+                    ;;
+    ses )           sesnote=1
+                    ;;
+    log )           lognote=1
+esac
+
+filename=$2
+[[ ! $filename ]] && exit_error "--file: Missing filename"
 
 [[ $sesnote = 0 ]] && [[ $filenote = 0 ]] && [[ $lognote = 0 ]] && exit_error "Nothing to do here!" 
 [[ $filenote = 1 ]] && [[ ! $filename ]] && exit_error "No filename provided!"
 ##############################  }}}1
 #- main ---------------------------------------------------------------#
 if [[ $filenote = 1 ]]; then
+    dir=$(dirname ${filename})
+    filename=${filename##*/}
     cd $dir 
     [[ $? != 0 ]] && exit_error "Directory $dir could not be accessed!"
     [[ ! -f $filename ]] && exit_error "File $filename does not exist!"
